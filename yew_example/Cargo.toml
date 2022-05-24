@@ -1,0 +1,16 @@
+[package]
+name = "yew_example"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+yew = "0.19.3"
+# console.log
+gloo = "0.6.1"
+# 序列化
+serde = "1.0.136"
+serde_json = "1.0.79"
+# 内联 css
+stylist = { version = "0.10", features = ["yew"] }
