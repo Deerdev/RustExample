@@ -8,6 +8,12 @@ cargo install cargo-generate
 ```
 wasm-pack build
 ```
+## test
+```
+wasm-pack test --chrome --headless
+wasm-pack test --firefox --headless
+```
+
 
 ## with a web page
 ```

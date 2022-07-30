@@ -2,6 +2,7 @@ mod utils;
 
 use wasm_bindgen::prelude::*;
 extern crate js_sys;
+extern crate web_sys;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -19,6 +20,13 @@ pub fn greet() {
     alert("Hello, wasm-game-of-life!");
 }
 
+// A macro to provide `println!(..)`-style syntax for `console.log` logging.
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
+
 #[wasm_bindgen]
 #[repr(u8)] // 一个单元格 u8大小，一个字节
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,14 +35,23 @@ pub enum Cell {
     Alive = 1,
 }
 
+impl Cell {
+    fn toggle(&mut self) {
+        *self = match *self {
+            Cell::Dead => Cell::Alive,
+            Cell::Alive => Cell::Dead,
+        };
+    }
+}
+
 #[wasm_bindgen]
-pub struct UniverseU8 {
+pub struct Universe {
     width: u32,
     height: u32,
     cells: Vec<Cell>,
 }
 
-impl UniverseU8 {
+impl Universe {
     fn get_index(&self, row: u32, column: u32) -> usize {
         (row * self.width + column) as usize
     }
@@ -56,8 +73,11 @@ impl UniverseU8 {
 }
 
 #[wasm_bindgen]
-impl UniverseU8 {
-    pub fn new() -> UniverseU8 {
+impl Universe {
+    pub fn new() -> Universe {
+        // https://github.com/rustwasm/console_error_panic_hook
+        // 注入 onsole_error_panic_hook，panic 时可以通过 console.error打印堆栈信息
+        utils::set_panic_hook();
         let width = 64;
         let height = 64;
         let cells = (0..width * height)
@@ -74,7 +94,7 @@ impl UniverseU8 {
                 // }
             })
             .collect();
-        UniverseU8 {
+        Universe {
             width: width,
             height: height,
             cells: cells,
@@ -92,7 +112,8 @@ impl UniverseU8 {
                 let idx = self.get_index(row, col);
                 let cell = self.cells[idx];
                 let live_neighbors = self.live_neighbor_count(row, col);
-                println!("{:?}: {}, ({}, {})", cell, live_neighbors, row, col);
+                // 打印 console.log
+                log!("live neighbor count: {}", live_neighbors);
                 let next_cell = match (cell, live_neighbors) {
                     // Rule 1: Any live cell with fewer than two live neighbours
                     // dies, as if caused by underpopulation.
@@ -126,11 +147,42 @@ impl UniverseU8 {
     pub fn cells(&self) -> *const Cell {
         self.cells.as_ptr()
     }
+
+    pub fn set_width(&mut self, width: u32) {
+        self.width = width;
+        self.cells = (0..width * self.height).map(|_i| Cell::Dead).collect();
+    }
+
+    pub fn set_height(&mut self, height: u32) {
+        self.height = height;
+        self.cells = (0..self.width * height).map(|_i| Cell::Dead).collect();
+    }
+
+    pub fn toggle_cell(&mut self, row: u32, column: u32) {
+        let idx = self.get_index(row, column);
+        self.cells[idx].toggle();
+    }
+}
+
+impl Universe {
+    /// Get the dead and alive values of the entire universe.
+    pub fn get_cells(&self) -> &[Cell] {
+        &self.cells
+    }
+
+    /// Set cells to be alive in a universe by passing the row and column
+    /// of each cell as an array.
+    pub fn set_cells(&mut self, cells: &[(u32, u32)]) {
+        for (row, col) in cells.iter().cloned() {
+            let idx = self.get_index(row, col);
+            self.cells[idx] = Cell::Alive;
+        }
+    }
 }
 
 use std::fmt;
 
-impl fmt::Display for UniverseU8 {
+impl fmt::Display for Universe {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for line in self.cells.as_slice().chunks(self.width as usize) {
             for &cell in line {
@@ -150,13 +202,13 @@ extern crate fixedbitset;
 use fixedbitset::FixedBitSet;
 
 #[wasm_bindgen]
-pub struct Universe {
+pub struct UniverseBit {
     width: u32,
     height: u32,
     cells: FixedBitSet,
 }
 
-impl Universe {
+impl UniverseBit {
     fn get_index(&self, row: u32, column: u32) -> usize {
         (row * self.width + column) as usize
     }
@@ -178,8 +230,8 @@ impl Universe {
 }
 
 #[wasm_bindgen]
-impl Universe {
-    pub fn new() -> Universe {
+impl UniverseBit {
+    pub fn new() -> UniverseBit {
         let width = 64;
         let height = 64;
         let size = (width * height) as usize;
@@ -187,7 +239,7 @@ impl Universe {
         for i in 0..size {
             cells.set(i, i % 2 == 0 || i % 7 == 0)
         }
-        Universe {
+        UniverseBit {
             width: width,
             height: height,
             cells: cells,
